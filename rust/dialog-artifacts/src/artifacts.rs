@@ -197,6 +197,32 @@ where
         Ok(())
     }
 
+    /// Stream all artifacts in the store
+    ///
+    /// Unlike export(), this yields Artifact structs directly without CSV serialization.
+    /// Useful for introspection and schema discovery.
+    pub fn stream_all(&self) -> impl Stream<Item = Result<Artifact, DialogArtifactsError>> + '_ {
+        use crate::{EntityKey, KeyViewConstruct};
+
+        async_stream::try_stream! {
+            let index = self.index.read().await;
+            let range = <EntityKey<Key> as KeyViewConstruct>::min().0
+                ..<EntityKey<Key> as KeyViewConstruct>::max().0;
+            let entity_stream = index.stream_range(range);
+
+            tokio::pin!(entity_stream);
+
+            while let Some(entry) = entity_stream.try_next().await? {
+                let Entry { value, .. } = entry;
+
+                if let State::Added(datum) = value {
+                    let artifact = Artifact::try_from(datum)?;
+                    yield artifact;
+                }
+            }
+        }
+    }
+
     #[cfg(feature = "csv")]
     /// Import data from a CSV laid out like the one produced by
     /// [`Artifacts::export`]
