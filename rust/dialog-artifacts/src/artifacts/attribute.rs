@@ -38,12 +38,11 @@ impl TryFrom<String> for Attribute {
             )));
         }
 
-        // TODO: Decide if we want to enforce this
-        let Some((_namespace, _predicate)) = value.split_once('/') else {
-            return Err(DialogArtifactsError::InvalidAttribute(format!(
-                "Attribute format is \"namespace/predicate\", but got \"{value}\""
-            )));
-        };
+        // Decision (2026-05-11): drop the `namespace/predicate` requirement.
+        // L30's edge vocabulary uses CURIE-form names like `l30:dependsOn`
+        // (no slash) per ontology/vocab.ttl. Enforcing the slash blocks
+        // those at the storage boundary. Length validation above is the
+        // only remaining structural gate.
 
         let mut bytes = [0; ATTRIBUTE_LENGTH];
         bytes[0..value.len()].copy_from_slice(value.as_bytes());
